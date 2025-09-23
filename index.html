@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Generador de Tarjetas de Cumpleaños</title>
     <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&family=Dancing+Script:wght@700&family=Pacifico&family=Lobster&family=Bebas+Neue&display=swap" rel="stylesheet">
     <style>
         :root {
             --primary-color: #4a6fa5;
@@ -103,7 +104,7 @@
             color: var(--primary-color);
         }
 
-        input, select, button {
+        input, select, button, textarea {
             width: 100%;
             padding: 12px;
             border: 1px solid #ddd;
@@ -217,64 +218,99 @@
             position: relative;
         }
 
+        .text-element {
+            position: absolute;
+            cursor: move;
+            user-select: none;
+            z-index: 10;
+            transition: all 0.2s;
+        }
+
+        .text-element.selected {
+            outline: 2px dashed var(--gold-color);
+            outline-offset: 2px;
+        }
+
         .card-title {
             font-size: 3.5rem;
             color: white;
             text-shadow: 3px 3px 6px rgba(0, 0, 0, 0.5);
-            margin-bottom: 15px;
             font-weight: 700;
             letter-spacing: 1px;
+            margin: 0;
+            font-family: 'Dancing Script', cursive;
         }
 
         .card-month {
             font-size: 2.5rem;
             color: var(--gold-color);
             text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
-            margin-bottom: 40px;
             font-weight: 600;
+            margin: 0;
+            font-family: 'Roboto', sans-serif;
         }
 
-        .photos-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
-            gap: 15px;
-            width: 100%;
-            max-width: 600px;
-            margin: 0 auto;
-        }
-
-        .photo-container {
+        .photos-container {
             position: relative;
             width: 100%;
-            aspect-ratio: 1;
+            height: 300px;
+        }
+
+        .photo-item {
+            position: absolute;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            cursor: move;
+            transition: transform 0.2s;
+            z-index: 5;
+        }
+
+        .photo-item.selected {
+            outline: 2px dashed var(--gold-color);
+            outline-offset: 5px;
+            border-radius: 50%;
+        }
+
+        .photo-circle {
             border-radius: 50%;
             overflow: hidden;
             border: 4px solid white;
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
-            transition: transform 0.3s;
+            background-color: #f0f0f0;
         }
 
-        .photo-container:hover {
-            transform: scale(1.05);
-        }
-
-        .photo-container img {
+        .photo-circle img {
             width: 100%;
             height: 100%;
             object-fit: cover;
         }
 
+        .photo-name {
+            margin-top: 8px;
+            background: rgba(255, 255, 255, 0.8);
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--dark-color);
+            max-width: 120px;
+            text-align: center;
+            word-break: break-word;
+        }
+
         .empty-photo {
-            background-color: rgba(255, 255, 255, 0.3);
             display: flex;
             align-items: center;
             justify-content: center;
             color: white;
             font-size: 1rem;
             text-align: center;
-            grid-column: 1 / -1;
             padding: 20px;
             border-radius: 10px;
+            background-color: rgba(255, 255, 255, 0.3);
+            width: 100%;
+            height: 100%;
         }
 
         .download-btn {
@@ -428,7 +464,7 @@
             object-fit: contain;
         }
 
-        .decoration-controls {
+        .element-controls {
             background: #f8f9fa;
             padding: 15px;
             border-radius: 10px;
@@ -451,16 +487,15 @@
         }
 
         input[type="range"].slider {
-            -webkit-appearance: none; /* Chrome, Safari, Edge */
-            -moz-appearance: none;    /* Firefox */
-            appearance: none;         /* Estandar */
-            width: 100%;
-            height: 8px;
-            border-radius: 4px;
-            background: #ddd;
-            outline: none;
+        -webkit-appearance: none; /* Chrome, Safari, Edge */
+        -moz-appearance: none;    /* Firefox */
+        appearance: none;         /* Estandar */
+        width: 100%;
+        height: 8px;
+        border-radius: 4px;
+        background: #ddd;
+        outline: none;
         }
-
 
         .slider::-webkit-slider-thumb {
             -webkit-appearance: none;
@@ -480,7 +515,7 @@
             border: none;
         }
 
-        .remove-decoration {
+        .remove-btn {
             background: var(--accent-color);
             color: white;
             border: none;
@@ -492,7 +527,7 @@
             width: 100%;
         }
 
-        .add-decoration {
+        .add-btn {
             background: var(--secondary-color);
             color: white;
             border: none;
@@ -504,11 +539,126 @@
             width: 100%;
         }
 
-        .no-decoration {
+        .no-selection {
             text-align: center;
             color: #666;
             font-style: italic;
             padding: 20px;
+        }
+
+        .tab-buttons {
+            display: flex;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .tab-button {
+            padding: 10px 15px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            color: var(--dark-color);
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s;
+        }
+
+        .tab-button.active {
+            color: var(--primary-color);
+            border-bottom-color: var(--primary-color);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .names-input {
+            margin-top: 15px;
+        }
+
+        .name-input-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+            align-items: center;
+        }
+
+        .name-input-group input {
+            flex: 1;
+        }
+
+        .name-input-group .photo-index {
+            font-weight: bold;
+            min-width: 30px;
+            text-align: center;
+        }
+
+        .font-options {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .font-option {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 14px;
+        }
+
+        .font-option:hover {
+            border-color: var(--primary-color);
+        }
+
+        .font-option.selected {
+            border-color: var(--primary-color);
+            background-color: var(--primary-color);
+            color: white;
+        }
+
+        .font-preview {
+            font-size: 16px;
+        }
+
+        .text-shadow-control {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .text-shadow-control input[type="checkbox"] {
+            width: auto;
+        }
+
+        .text-style-controls {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .text-style-btn {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background: white;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 14px;
+        }
+
+        .text-style-btn.active {
+            background: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
         }
     </style>
 </head>
@@ -528,6 +678,13 @@
                 </div>
                 <div class="uploaded-photos" id="uploaded-photos-container">
                     <!-- Las fotos subidas aparecerán aquí -->
+                </div>
+            </div>
+
+            <div class="form-group names-input" id="names-input-container" style="display: none;">
+                <label>👤 Nombres de los colaboradores:</label>
+                <div id="name-inputs">
+                    <!-- Los inputs de nombres se generarán aquí -->
                 </div>
             </div>
 
@@ -558,63 +715,6 @@
                     <div class="background-option image-option" data-type="gradient" data-value="sunset" style="background: linear-gradient(135deg, #ff9a9e 0%, #fad0c4 100%);">Atardecer</div>
                     <div class="background-option image-option" data-type="gradient" data-value="ocean" style="background: linear-gradient(135deg, #a1c4fd 0%, #c2e9fb 100%);">Océano</div>
                     <div class="background-option image-option" data-type="gradient" data-value="purple" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">Púrpura</div>
-                    <div class="background-option image-option" data-type="gradient" data-value="rainbow" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">Arcoíris</div>
-                    <div class="background-option image-option" data-type="gradient" data-value="gold" style="background: linear-gradient(135deg, #f6d365 0%, #fda085 100%);">Dorado</div>
-                    <div class="background-option image-option" data-type="gradient" data-value="green" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">Verde Azulado</div>
-                    <!-- Fiesta multicolor -->
-                    <div class="background-option image-option" data-type="gradient" data-value="party" 
-                        style="background: linear-gradient(135deg, #ff9a9e 0%, #fad0c4 25%, #fad0c4 50%, #fbc2eb 75%, #a18cd1 100%);">
-                        Fiesta
-                    </div>
-
-                    <!-- Azul eléctrico -->
-                    <div class="background-option image-option" data-type="gradient" data-value="electric" 
-                        style="background: linear-gradient(135deg, #1f4037 0%, #99f2c8 100%);">
-                        Azul Eléctrico
-                    </div>
-
-                    <!-- Fuegos artificiales -->
-                    <div class="background-option image-option" data-type="gradient" data-value="fireworks" 
-                        style="background: linear-gradient(135deg, #ff6a00 0%, #ee0979 50%, #ff6a00 100%);">
-                        Fuegos Artificiales
-                    </div>
-
-                    <!-- Pastel festivo -->
-                    <div class="background-option image-option" data-type="gradient" data-value="pastel" 
-                        style="background: linear-gradient(135deg, #a1c4fd 0%, #c2e9fb 50%, #fbc2eb 100%);">
-                        Pastel
-                    </div>
-
-                    <!-- Tropical -->
-                    <div class="background-option image-option" data-type="gradient" data-value="tropical" 
-                        style="background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 25%, #fe99c6 50%, #fecfef 75%, #ff9a9e 100%);">
-                        Tropical
-                    </div>
-
-                    <!-- Neón -->
-                    <div class="background-option image-option" data-type="gradient" data-value="neon" 
-                        style="background: linear-gradient(135deg, #00f260 0%, #0575e6 100%);">
-                        Neón
-                    </div>
-
-                    <!-- Candy -->
-                    <div class="background-option image-option" data-type="gradient" data-value="candy" 
-                        style="background: linear-gradient(135deg, #ffdde1 0%, #ee9ca7 100%);">
-                        Dulce
-                    </div>
-
-                    <!-- Carnaval -->
-                    <div class="background-option image-option" data-type="gradient" data-value="carnival" 
-                        style="background: linear-gradient(135deg, #f7971e 0%, #ffd200 50%, #f7971e 100%);">
-                        Carnaval
-                    </div>
-
-                    <!-- Galaxia -->
-                    <div class="background-option image-option" data-type="gradient" data-value="galaxy" 
-                        style="background: linear-gradient(135deg, #654ea3 0%, #eaafc8 100%);">
-                        Galaxia
-                    </div>
-
                 </div>
             </div>
 
@@ -637,10 +737,11 @@
                 <h3>Instrucciones:</h3>
                 <ol>
                     <li>Sube las fotos de los colaboradores</li>
+                    <li>Ingresa los nombres (opcional)</li>
                     <li>Selecciona el mes de celebración</li>
                     <li>Elige un fondo para la tarjeta</li>
                     <li>Opcional: Añade un marco personalizado</li>
-                    <li>Añade y personaliza decoraciones</li>
+                    <li>Personaliza textos y decoraciones</li>
                     <li>Visualiza la tarjeta generada</li>
                     <li>Descarga la tarjeta cuando esté lista</li>
                 </ol>
@@ -653,14 +754,23 @@
                 <!-- Marco de la tarjeta -->
                 <div id="card-frame" class="frame"></div>
                 
-                <div class="card-content">
-                    <h2 class="card-title">Feliz Cumpleaños</h2>
-                    <p class="card-month" id="card-month">Enero</p>
-                    <div class="photos-grid" id="photos-grid">
-                        <div class="photo-container empty-photo">
-                            Sube fotos para ver la tarjeta
-                        </div>
+                <!-- Textos editables -->
+                <div class="text-element card-title" id="title-text" 
+                     style="top: 15%; left: 50%; transform: translate(-50%, -50%); font-size: 3.5rem; font-family: 'Dancing Script', cursive;">
+                    Feliz Cumpleaños
+                </div>
+                
+                <div class="text-element card-month" id="month-text" 
+                     style="top: 25%; left: 50%; transform: translate(-50%, -50%); font-size: 2.5rem; font-family: 'Roboto', sans-serif;">
+                    Enero
+                </div>
+                
+                <!-- Contenedor de fotos -->
+                <div class="photos-container" id="photos-container">
+                    <div class="empty-photo" id="empty-photo-message">
+                        Sube fotos para ver la tarjeta
                     </div>
+                    <!-- Las fotos se añadirán aquí dinámicamente -->
                 </div>
                 
                 <!-- Las decoraciones se añadirán aquí dinámicamente -->
@@ -669,18 +779,44 @@
         </section>
 
         <section class="decorations-panel">
-            <h3>🎊 Decoraciones</h3>
-            
-            <div class="form-group">
-                <label>Selecciona una decoración:</label>
-                <div class="decorations-options" id="decorations-options">
-                    <!-- Las opciones de decoración se generarán dinámicamente -->
-                </div>
-                <button class="add-decoration" id="add-decoration-btn">➕ Añadir Decoración Seleccionada</button>
+            <div class="tab-buttons">
+                <button class="tab-button active" data-tab="decorations">🎊 Decoraciones</button>
+                <button class="tab-button" data-tab="text">📝 Textos</button>
+                <button class="tab-button" data-tab="photos">👥 Fotos</button>
             </div>
 
-            <div id="decoration-controls-container">
-                <div class="no-decoration">Selecciona una decoración para personalizarla</div>
+            <div class="tab-content active" id="decorations-tab">
+                <div class="form-group">
+                    <label>Selecciona una decoración:</label>
+                    <div class="decorations-options" id="decorations-options">
+                        <!-- Las opciones de decoración se generarán dinámicamente -->
+                    </div>
+                    <button class="add-btn" id="add-decoration-btn">➕ Añadir Decoración</button>
+                </div>
+
+                <div id="decoration-controls-container">
+                    <div class="no-selection">Selecciona una decoración para personalizarla</div>
+                </div>
+            </div>
+
+            <div class="tab-content" id="text-tab">
+                <div class="form-group">
+                    <label for="title-input">Texto principal:</label>
+                    <input type="text" id="title-input" value="Feliz Cumpleaños">
+                </div>
+                <div class="form-group">
+                    <label for="month-text-input">Texto del mes:</label>
+                    <input type="text" id="month-text-input" value="Enero">
+                </div>
+                <div id="text-controls-container">
+                    <div class="no-selection">Selecciona un texto en la tarjeta para personalizarlo</div>
+                </div>
+            </div>
+
+            <div class="tab-content" id="photos-tab">
+                <div id="photo-controls-container">
+                    <div class="no-selection">Selecciona una foto en la tarjeta para personalizarla</div>
+                </div>
             </div>
         </section>
     </div>
@@ -688,6 +824,7 @@
     <script>
         // Variables globales
         let uploadedPhotos = [];
+        let photoNames = [];
         let currentBackground = {
             type: 'color',
             value: '#4a6fa5'
@@ -695,7 +832,8 @@
         let currentFrame = 'none';
         let customFrameImage = null;
         let decorations = [];
-        let selectedDecorationId = null;
+        let selectedElement = null;
+        let selectedElementType = null; // 'decoration', 'text', 'photo'
         let isDragging = false;
         let dragOffset = { x: 0, y: 0 };
 
@@ -715,12 +853,30 @@
             { id: 'happy3', name: 'Feliz 3', src: 'assets/happy3.png', width: 70, height: 70 }
         ];
 
+        // Fuentes disponibles
+        const fontOptions = [
+            { name: 'Dancing Script', value: "'Dancing Script', cursive", category: 'cursiva' },
+            { name: 'Pacifico', value: "'Pacifico', cursive", category: 'cursiva' },
+            { name: 'Lobster', value: "'Lobster', cursive", category: 'cursiva' },
+            { name: 'Roboto', value: "'Roboto', sans-serif", category: 'sans-serif' },
+            { name: 'Bebas Neue', value: "'Bebas Neue', sans-serif", category: 'sans-serif' },
+            { name: 'Arial', value: "Arial, sans-serif", category: 'sans-serif' },
+            { name: 'Times New Roman', value: "'Times New Roman', serif", category: 'serif' },
+            { name: 'Georgia', value: "Georgia, serif", category: 'serif' }
+        ];
+
         // Elementos DOM
         const photoUpload = document.getElementById('photo-upload');
         const uploadedPhotosContainer = document.getElementById('uploaded-photos-container');
+        const namesInputContainer = document.getElementById('names-input-container');
+        const nameInputsContainer = document.getElementById('name-inputs');
         const monthSelect = document.getElementById('month-select');
-        const cardMonth = document.getElementById('card-month');
-        const photosGrid = document.getElementById('photos-grid');
+        const titleInput = document.getElementById('title-input');
+        const monthTextInput = document.getElementById('month-text-input');
+        const titleText = document.getElementById('title-text');
+        const monthText = document.getElementById('month-text');
+        const photosContainer = document.getElementById('photos-container');
+        const emptyPhotoMessage = document.getElementById('empty-photo-message');
         const birthdayCard = document.getElementById('birthday-card');
         const backgroundOptions = document.querySelectorAll('.background-option');
         const frameOptions = document.querySelectorAll('.frame-option');
@@ -731,16 +887,37 @@
         const decorationsOptions = document.getElementById('decorations-options');
         const addDecorationBtn = document.getElementById('add-decoration-btn');
         const decorationControlsContainer = document.getElementById('decoration-controls-container');
+        const textControlsContainer = document.getElementById('text-controls-container');
+        const photoControlsContainer = document.getElementById('photo-controls-container');
+        const tabButtons = document.querySelectorAll('.tab-button');
+        const tabContents = document.querySelectorAll('.tab-content');
 
         // Inicialización de la aplicación
         document.addEventListener('DOMContentLoaded', function() {
             // Configurar event listeners
             photoUpload.addEventListener('change', handlePhotoUpload);
             monthSelect.addEventListener('change', updateCardMonth);
+            titleInput.addEventListener('input', updateTitleText);
+            monthTextInput.addEventListener('input', updateMonthText);
             downloadBtn.addEventListener('click', downloadCard);
             resetBtn.addEventListener('click', resetApp);
             frameUpload.addEventListener('change', handleFrameUpload);
             addDecorationBtn.addEventListener('click', addSelectedDecoration);
+            
+            // Configurar pestañas
+            tabButtons.forEach(button => {
+                button.addEventListener('click', function() {
+                    const tabId = this.getAttribute('data-tab');
+                    
+                    // Actualizar botones de pestaña
+                    tabButtons.forEach(btn => btn.classList.remove('active'));
+                    this.classList.add('active');
+                    
+                    // Actualizar contenido de pestañas
+                    tabContents.forEach(content => content.classList.remove('active'));
+                    document.getElementById(`${tabId}-tab`).classList.add('active');
+                });
+            });
             
             // Configurar opciones de fondo
             backgroundOptions.forEach(option => {
@@ -771,11 +948,29 @@
                 });
             });
 
+            // Configurar eventos de selección para textos
+            titleText.addEventListener('click', function(e) {
+                e.stopPropagation();
+                selectText(titleText);
+            });
+            
+            monthText.addEventListener('click', function(e) {
+                e.stopPropagation();
+                selectText(monthText);
+            });
+
             // Generar opciones de decoraciones
             generateDecorationOptions();
 
             // Inicializar la tarjeta
             updateCardBackground();
+            
+            // Deseleccionar al hacer clic en cualquier parte de la tarjeta
+            birthdayCard.addEventListener('click', function(e) {
+                if (e.target === birthdayCard) {
+                    deselectAll();
+                }
+            });
         });
 
         // Generar las opciones de decoraciones
@@ -837,7 +1032,7 @@
             decorations.forEach(decoration => {
                 const decorationEl = document.createElement('img');
                 decorationEl.className = 'decoration';
-                if (decoration.id === selectedDecorationId) {
+                if (selectedElementType === 'decoration' && selectedElement && selectedElement.getAttribute('data-id') == decoration.id) {
                     decorationEl.classList.add('selected');
                 }
                 
@@ -860,56 +1055,267 @@
                 birthdayCard.appendChild(decorationEl);
             });
             
-            // Si no hay decoraciones seleccionadas, mostrar mensaje
-            updateDecorationControls();
+            // Actualizar controles
+            updateElementControls();
+        }
+
+        // Renderizar las fotos en la tarjeta
+        function renderPhotos() {
+            // Limpiar fotos existentes
+            document.querySelectorAll('.photo-item').forEach(el => el.remove());
+            
+            if (uploadedPhotos.length === 0) {
+                emptyPhotoMessage.style.display = 'flex';
+                namesInputContainer.style.display = 'none';
+                return;
+            }
+            
+            emptyPhotoMessage.style.display = 'none';
+            namesInputContainer.style.display = 'block';
+            
+            // Calcular posiciones iniciales para las fotos
+            const photoCount = uploadedPhotos.length;
+            const centerX = 50;
+            const centerY = 60;
+            const radius = Math.min(30, 150 / photoCount);
+            
+            uploadedPhotos.forEach((photo, index) => {
+                const angle = (index / photoCount) * 2 * Math.PI;
+                const x = centerX + radius * Math.cos(angle);
+                const y = centerY + radius * Math.sin(angle);
+                
+                const photoItem = document.createElement('div');
+                photoItem.className = 'photo-item';
+                if (selectedElementType === 'photo' && selectedElement && selectedElement.getAttribute('data-id') == photo.id) {
+                    photoItem.classList.add('selected');
+                }
+                
+                photoItem.setAttribute('data-id', photo.id);
+                photoItem.style.left = `${x}%`;
+                photoItem.style.top = `${y}%`;
+                photoItem.style.transform = 'translate(-50%, -50%)';
+                
+                const photoCircle = document.createElement('div');
+                photoCircle.className = 'photo-circle';
+                photoCircle.style.width = '100px';
+                photoCircle.style.height = '100px';
+                photoCircle.innerHTML = `<img src="${photo.src}" alt="Foto colaborador">`;
+                
+                const photoName = document.createElement('div');
+                photoName.className = 'photo-name';
+                photoName.textContent = photoNames[index] || '';
+                
+                photoItem.appendChild(photoCircle);
+                photoItem.appendChild(photoName);
+                
+                // Eventos para seleccionar y arrastrar
+                photoItem.addEventListener('mousedown', startDrag);
+                photoItem.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    selectPhoto(photo.id);
+                });
+                
+                photosContainer.appendChild(photoItem);
+            });
+            
+            // Actualizar controles
+            updateElementControls();
         }
 
         // Seleccionar una decoración
         function selectDecoration(id) {
-            selectedDecorationId = id;
+            const decoration = decorations.find(d => d.id === id);
+            if (!decoration) return;
+            
+            selectedElement = document.querySelector(`.decoration[data-id="${id}"]`);
+            selectedElementType = 'decoration';
             
             // Actualizar estilos visuales
-            document.querySelectorAll('.decoration').forEach(el => {
+            updateSelectionStyles();
+            updateElementControls();
+        }
+
+        // Seleccionar un texto
+        function selectText(element) {
+            selectedElement = element;
+            selectedElementType = 'text';
+            
+            // Actualizar estilos visuales
+            updateSelectionStyles();
+            updateElementControls();
+        }
+
+        // Seleccionar una foto
+        function selectPhoto(id) {
+            const photoItem = document.querySelector(`.photo-item[data-id="${id}"]`);
+            if (!photoItem) return;
+            
+            selectedElement = photoItem;
+            selectedElementType = 'photo';
+            
+            // Actualizar estilos visuales
+            updateSelectionStyles();
+            updateElementControls();
+        }
+
+        // Actualizar estilos de selección
+        function updateSelectionStyles() {
+            // Remover selección de todos los elementos
+            document.querySelectorAll('.decoration, .text-element, .photo-item').forEach(el => {
                 el.classList.remove('selected');
             });
             
-            const selectedEl = document.querySelector(`.decoration[data-id="${id}"]`);
-            if (selectedEl) {
-                selectedEl.classList.add('selected');
+            // Aplicar selección al elemento actual
+            if (selectedElement) {
+                selectedElement.classList.add('selected');
             }
-            
-            updateDecorationControls();
         }
 
-        // Actualizar controles de decoración
-        function updateDecorationControls() {
-            if (selectedDecorationId === null) {
-                decorationControlsContainer.innerHTML = '<div class="no-decoration">Selecciona una decoración para personalizarla</div>';
+        // Deseleccionar todos los elementos
+        function deselectAll() {
+            selectedElement = null;
+            selectedElementType = null;
+            updateSelectionStyles();
+            updateElementControls();
+        }
+
+        // Actualizar controles del elemento seleccionado
+        function updateElementControls() {
+            // Limpiar controles
+            decorationControlsContainer.innerHTML = '';
+            textControlsContainer.innerHTML = '';
+            photoControlsContainer.innerHTML = '';
+            
+            if (!selectedElement) {
+                decorationControlsContainer.innerHTML = '<div class="no-selection">Selecciona una decoración para personalizarla</div>';
+                textControlsContainer.innerHTML = '<div class="no-selection">Selecciona un texto en la tarjeta para personalizarlo</div>';
+                photoControlsContainer.innerHTML = '<div class="no-selection">Selecciona una foto en la tarjeta para personalizarla</div>';
                 return;
             }
             
-            const decoration = decorations.find(d => d.id === selectedDecorationId);
-            if (!decoration) return;
-            
-            decorationControlsContainer.innerHTML = `
-                <div class="decoration-controls">
-                    <div class="control-group">
-                        <label>Posición X: <span>${decoration.x}%</span></label>
-                        <input type="range" min="0" max="100" value="${decoration.x}" class="slider" id="pos-x">
+            if (selectedElementType === 'decoration') {
+                const decoration = decorations.find(d => d.id == selectedElement.getAttribute('data-id'));
+                if (!decoration) return;
+                
+                decorationControlsContainer.innerHTML = `
+                    <div class="element-controls">
+                        <div class="control-group">
+                            <label>Posición X: <span>${decoration.x}%</span></label>
+                            <input type="range" min="0" max="100" value="${decoration.x}" class="slider" id="pos-x">
+                        </div>
+                        <div class="control-group">
+                            <label>Posición Y: <span>${decoration.y}%</span></label>
+                            <input type="range" min="0" max="100" value="${decoration.y}" class="slider" id="pos-y">
+                        </div>
+                        <div class="control-group">
+                            <label>Tamaño: <span>${Math.round(decoration.scale * 100)}%</span></label>
+                            <input type="range" min="10" max="200" value="${decoration.scale * 100}" class="slider" id="size">
+                        </div>
+                        <button class="remove-btn" id="remove-element">Eliminar Decoración</button>
                     </div>
-                    <div class="control-group">
-                        <label>Posición Y: <span>${decoration.y}%</span></label>
-                        <input type="range" min="0" max="100" value="${decoration.y}" class="slider" id="pos-y">
+                `;
+                
+                // Configurar event listeners para los controles
+                setupDecorationControls(decoration);
+            }
+            else if (selectedElementType === 'text') {
+                const isTitle = selectedElement.id === 'title-text';
+                const currentSize = parseInt(selectedElement.style.fontSize) || (isTitle ? 56 : 40);
+                const currentColor = selectedElement.style.color || (isTitle ? 'white' : '#ffd700');
+                const currentFont = selectedElement.style.fontFamily || (isTitle ? "'Dancing Script', cursive" : "'Roboto', sans-serif");
+                const hasShadow = selectedElement.style.textShadow !== 'none';
+                
+                // Obtener posición actual
+                const currentX = parseInt(selectedElement.style.left) || 50;
+                const currentY = parseInt(selectedElement.style.top) || (isTitle ? 15 : 25);
+                
+                // Obtener estilos de texto
+                const isBold = selectedElement.style.fontWeight === 'bold';
+                const isItalic = selectedElement.style.fontStyle === 'italic';
+                const isUnderline = selectedElement.style.textDecoration === 'underline';
+                
+                textControlsContainer.innerHTML = `
+                    <div class="element-controls">
+                        <div class="control-group">
+                            <label>Posición X: <span>${currentX}%</span></label>
+                            <input type="range" min="0" max="100" value="${currentX}" class="slider" id="text-pos-x">
+                        </div>
+                        <div class="control-group">
+                            <label>Posición Y: <span>${currentY}%</span></label>
+                            <input type="range" min="0" max="100" value="${currentY}" class="slider" id="text-pos-y">
+                        </div>
+                        <div class="control-group">
+                            <label>Tamaño: <span>${currentSize}px</span></label>
+                            <input type="range" min="20" max="120" value="${currentSize}" class="slider" id="text-size">
+                        </div>
+                        <div class="control-group">
+                            <label>Color:</label>
+                            <input type="color" id="text-color" value="${rgbToHex(currentColor)}">
+                        </div>
+                        <div class="control-group">
+                            <label>Tipografía:</label>
+                            <select id="text-font">
+                                ${fontOptions.map(font => 
+                                    `<option value="${font.value}" ${currentFont.includes(font.name) ? 'selected' : ''}>${font.name}</option>`
+                                ).join('')}
+                            </select>
+                        </div>
+                        <div class="control-group text-shadow-control">
+                            <label>Sombra de texto:</label>
+                            <input type="checkbox" id="text-shadow" ${hasShadow ? 'checked' : ''}>
+                        </div>
+                        <div class="control-group">
+                            <label>Estilo de texto:</label>
+                            <div class="text-style-controls">
+                                <button class="text-style-btn ${isBold ? 'active' : ''}" id="text-bold">B</button>
+                                <button class="text-style-btn ${isItalic ? 'active' : ''}" id="text-italic">I</button>
+                                <button class="text-style-btn ${isUnderline ? 'active' : ''}" id="text-underline">U</button>
+                            </div>
+                        </div>
                     </div>
-                    <div class="control-group">
-                        <label>Tamaño: <span>${Math.round(decoration.scale * 100)}%</span></label>
-                        <input type="range" min="10" max="200" value="${decoration.scale * 100}" class="slider" id="size">
+                `;
+                
+                // Configurar event listeners para los controles de texto
+                setupTextControls();
+            }
+            else if (selectedElementType === 'photo') {
+                const photoId = parseInt(selectedElement.getAttribute('data-id'));
+                const photoIndex = uploadedPhotos.findIndex(p => p.id === photoId);
+                const photoCircle = selectedElement.querySelector('.photo-circle');
+                const currentSize = parseInt(photoCircle.style.width) || 100;
+                
+                // Obtener posición actual
+                const currentX = parseInt(selectedElement.style.left) || 50;
+                const currentY = parseInt(selectedElement.style.top) || 60;
+                
+                photoControlsContainer.innerHTML = `
+                    <div class="element-controls">
+                        <div class="control-group">
+                            <label>Posición X: <span>${currentX}%</span></label>
+                            <input type="range" min="0" max="100" value="${currentX}" class="slider" id="photo-pos-x">
+                        </div>
+                        <div class="control-group">
+                            <label>Posición Y: <span>${currentY}%</span></label>
+                            <input type="range" min="0" max="100" value="${currentY}" class="slider" id="photo-pos-y">
+                        </div>
+                        <div class="control-group">
+                            <label>Tamaño: <span>${currentSize}px</span></label>
+                            <input type="range" min="50" max="200" value="${currentSize}" class="slider" id="photo-size">
+                        </div>
+                        <div class="control-group">
+                            <label>Nombre:</label>
+                            <input type="text" id="photo-name" value="${photoNames[photoIndex] || ''}" placeholder="Dejar vacío para ocultar">
+                        </div>
                     </div>
-                    <button class="remove-decoration" id="remove-decoration">Eliminar Decoración</button>
-                </div>
-            `;
-            
-            // Configurar event listeners para los controles
+                `;
+                
+                // Configurar event listeners para los controles de foto
+                setupPhotoControls(photoId, photoIndex, photoCircle);
+            }
+        }
+
+        // Configurar controles de decoración
+        function setupDecorationControls(decoration) {
             document.getElementById('pos-x').addEventListener('input', function() {
                 decoration.x = parseInt(this.value);
                 document.querySelector('.control-group label span').textContent = `${decoration.x}%`;
@@ -928,49 +1334,184 @@
                 renderDecorations();
             });
             
-            document.getElementById('remove-decoration').addEventListener('click', function() {
-                decorations = decorations.filter(d => d.id !== selectedDecorationId);
-                selectedDecorationId = null;
+            document.getElementById('remove-element').addEventListener('click', function() {
+                decorations = decorations.filter(d => d.id !== decoration.id);
+                deselectAll();
                 renderDecorations();
             });
         }
 
-        // Funcionalidad de arrastrar decoraciones
-        function startDrag(e) {
-            const decorationId = parseInt(e.target.getAttribute('data-id'));
-            const decoration = decorations.find(d => d.id === decorationId);
+        // Configurar controles de texto
+        function setupTextControls() {
+            document.getElementById('text-pos-x').addEventListener('input', function() {
+                selectedElement.style.left = `${this.value}%`;
+                document.querySelectorAll('.control-group label span')[0].textContent = `${this.value}%`;
+            });
             
-            if (!decoration) return;
+            document.getElementById('text-pos-y').addEventListener('input', function() {
+                selectedElement.style.top = `${this.value}%`;
+                document.querySelectorAll('.control-group label span')[1].textContent = `${this.value}%`;
+            });
+            
+            document.getElementById('text-size').addEventListener('input', function() {
+                selectedElement.style.fontSize = `${this.value}px`;
+                document.querySelectorAll('.control-group label span')[2].textContent = `${this.value}px`;
+            });
+            
+            document.getElementById('text-color').addEventListener('input', function() {
+                selectedElement.style.color = this.value;
+            });
+            
+            document.getElementById('text-font').addEventListener('change', function() {
+                selectedElement.style.fontFamily = this.value;
+            });
+            
+            document.getElementById('text-shadow').addEventListener('change', function() {
+                if (this.checked) {
+                    selectedElement.style.textShadow = '2px 2px 4px rgba(0, 0, 0, 0.5)';
+                } else {
+                    selectedElement.style.textShadow = 'none';
+                }
+            });
+            
+            // Estilos de texto (negrita, cursiva, subrayado)
+            document.getElementById('text-bold').addEventListener('click', function() {
+                this.classList.toggle('active');
+                selectedElement.style.fontWeight = this.classList.contains('active') ? 'bold' : 'normal';
+            });
+            
+            document.getElementById('text-italic').addEventListener('click', function() {
+                this.classList.toggle('active');
+                selectedElement.style.fontStyle = this.classList.contains('active') ? 'italic' : 'normal';
+            });
+            
+            document.getElementById('text-underline').addEventListener('click', function() {
+                this.classList.toggle('active');
+                selectedElement.style.textDecoration = this.classList.contains('active') ? 'underline' : 'none';
+            });
+        }
+
+        // Configurar controles de foto
+        function setupPhotoControls(photoId, photoIndex, photoCircle) {
+            document.getElementById('photo-pos-x').addEventListener('input', function() {
+                selectedElement.style.left = `${this.value}%`;
+                document.querySelectorAll('.control-group label span')[0].textContent = `${this.value}%`;
+            });
+            
+            document.getElementById('photo-pos-y').addEventListener('input', function() {
+                selectedElement.style.top = `${this.value}%`;
+                document.querySelectorAll('.control-group label span')[1].textContent = `${this.value}%`;
+            });
+            
+            document.getElementById('photo-size').addEventListener('input', function() {
+                const size = `${this.value}px`;
+                photoCircle.style.width = size;
+                photoCircle.style.height = size;
+                document.querySelectorAll('.control-group label span')[2].textContent = `${this.value}px`;
+            });
+            
+            document.getElementById('photo-name').addEventListener('input', function() {
+                photoNames[photoIndex] = this.value;
+                selectedElement.querySelector('.photo-name').textContent = this.value;
+            });
+        }
+
+        // Funcionalidad de arrastrar elementos
+        function startDrag(e) {
+            e.preventDefault();
+            e.stopPropagation();
             
             isDragging = true;
-            selectDecoration(decorationId);
             
             const rect = birthdayCard.getBoundingClientRect();
             const startX = e.clientX - rect.left;
             const startY = e.clientY - rect.top;
             
-            dragOffset = {
-                x: startX - (decoration.x / 100 * rect.width),
-                y: startY - (decoration.y / 100 * rect.height)
-            };
+            // Determinar qué tipo de elemento estamos arrastrando
+            if (e.target.classList.contains('decoration')) {
+                const decorationId = parseInt(e.target.getAttribute('data-id'));
+                const decoration = decorations.find(d => d.id === decorationId);
+                
+                if (!decoration) return;
+                
+                selectDecoration(decorationId);
+                
+                dragOffset = {
+                    x: startX - (decoration.x / 100 * rect.width),
+                    y: startY - (decoration.y / 100 * rect.height)
+                };
+            }
+            else if (e.target.classList.contains('text-element')) {
+                selectText(e.target);
+                
+                const currentX = parseInt(e.target.style.left) || 50;
+                const currentY = parseInt(e.target.style.top) || (e.target.id === 'title-text' ? 15 : 25);
+                
+                dragOffset = {
+                    x: startX - (currentX / 100 * rect.width),
+                    y: startY - (currentY / 100 * rect.height)
+                };
+            }
+            else if (e.target.closest('.photo-item')) {
+                const photoItem = e.target.closest('.photo-item');
+                const photoId = parseInt(photoItem.getAttribute('data-id'));
+                
+                selectPhoto(photoId);
+                
+                const currentX = parseInt(photoItem.style.left) || 50;
+                const currentY = parseInt(photoItem.style.top) || 60;
+                
+                dragOffset = {
+                    x: startX - (currentX / 100 * rect.width),
+                    y: startY - (currentY / 100 * rect.height)
+                };
+            }
             
             document.addEventListener('mousemove', drag);
             document.addEventListener('mouseup', stopDrag);
         }
 
         function drag(e) {
-            if (!isDragging) return;
+            if (!isDragging || !selectedElement) return;
             
             const rect = birthdayCard.getBoundingClientRect();
             const x = e.clientX - rect.left - dragOffset.x;
             const y = e.clientY - rect.top - dragOffset.y;
             
-            const decoration = decorations.find(d => d.id === selectedDecorationId);
-            if (decoration) {
-                decoration.x = Math.max(0, Math.min(100, (x / rect.width) * 100));
-                decoration.y = Math.max(0, Math.min(100, (y / rect.height) * 100));
+            const newX = Math.max(0, Math.min(100, (x / rect.width) * 100));
+            const newY = Math.max(0, Math.min(100, (y / rect.height) * 100));
+            
+            if (selectedElementType === 'decoration') {
+                const decorationId = parseInt(selectedElement.getAttribute('data-id'));
+                const decoration = decorations.find(d => d.id === decorationId);
                 
-                renderDecorations();
+                if (decoration) {
+                    decoration.x = newX;
+                    decoration.y = newY;
+                    renderDecorations();
+                }
+            }
+            else if (selectedElementType === 'text') {
+                selectedElement.style.left = `${newX}%`;
+                selectedElement.style.top = `${newY}%`;
+                
+                // Actualizar controles si están visibles
+                if (textControlsContainer.querySelector('.control-group')) {
+                    const spans = textControlsContainer.querySelectorAll('.control-group label span');
+                    if (spans[0]) spans[0].textContent = `${Math.round(newX)}%`;
+                    if (spans[1]) spans[1].textContent = `${Math.round(newY)}%`;
+                }
+            }
+            else if (selectedElementType === 'photo') {
+                selectedElement.style.left = `${newX}%`;
+                selectedElement.style.top = `${newY}%`;
+                
+                // Actualizar controles si están visibles
+                if (photoControlsContainer.querySelector('.control-group')) {
+                    const spans = photoControlsContainer.querySelectorAll('.control-group label span');
+                    if (spans[0]) spans[0].textContent = `${Math.round(newX)}%`;
+                    if (spans[1]) spans[1].textContent = `${Math.round(newY)}%`;
+                }
             }
         }
 
@@ -978,6 +1519,22 @@
             isDragging = false;
             document.removeEventListener('mousemove', drag);
             document.removeEventListener('mouseup', stopDrag);
+        }
+
+        // Convertir RGB a HEX
+        function rgbToHex(rgb) {
+            if (rgb.startsWith('#')) return rgb;
+            
+            // Extraer los valores RGB
+            const result = rgb.match(/\d+/g);
+            if (!result) return '#ffffff';
+            
+            const r = parseInt(result[0]);
+            const g = parseInt(result[1]);
+            const b = parseInt(result[2]);
+            
+            // Convertir a HEX
+            return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
         }
 
         // Manejar la subida de fotos
@@ -1001,9 +1558,13 @@
                         src: e.target.result
                     });
                     
+                    // Inicializar nombre vacío
+                    photoNames.push('');
+                    
                     // Actualizar la interfaz
                     updateUploadedPhotosDisplay();
-                    updateCardPhotos();
+                    renderPhotos();
+                    generateNameInputs();
                 };
                 
                 reader.readAsDataURL(file);
@@ -1011,6 +1572,39 @@
             
             // Limpiar el input para permitir subir las mismas fotos otra vez
             event.target.value = '';
+        }
+
+        // Generar inputs para nombres
+        function generateNameInputs() {
+            nameInputsContainer.innerHTML = '';
+            
+            uploadedPhotos.forEach((photo, index) => {
+                const nameInputGroup = document.createElement('div');
+                nameInputGroup.className = 'name-input-group';
+                
+                nameInputGroup.innerHTML = `
+                    <span class="photo-index">${index + 1}</span>
+                    <input type="text" class="name-input" data-index="${index}" 
+                           value="${photoNames[index] || ''}" 
+                           placeholder="Nombre del colaborador (opcional)">
+                `;
+                
+                nameInputsContainer.appendChild(nameInputGroup);
+            });
+            
+            // Configurar event listeners para los inputs de nombre
+            document.querySelectorAll('.name-input').forEach(input => {
+                input.addEventListener('input', function() {
+                    const index = parseInt(this.getAttribute('data-index'));
+                    photoNames[index] = this.value;
+                    
+                    // Actualizar nombre en la tarjeta
+                    const photoItem = document.querySelector(`.photo-item[data-id="${uploadedPhotos[index].id}"]`);
+                    if (photoItem) {
+                        photoItem.querySelector('.photo-name').textContent = this.value;
+                    }
+                });
+            });
         }
 
         // Manejar la subida de marco personalizado
@@ -1057,53 +1651,33 @@
 
         // Eliminar una foto
         function removePhoto(photoId) {
-            uploadedPhotos = uploadedPhotos.filter(photo => photo.id !== photoId);
+            const index = uploadedPhotos.findIndex(photo => photo.id === photoId);
+            if (index !== -1) {
+                uploadedPhotos.splice(index, 1);
+                photoNames.splice(index, 1);
+            }
+            
             updateUploadedPhotosDisplay();
-            updateCardPhotos();
+            renderPhotos();
+            generateNameInputs();
         }
 
         // Actualizar el mes en la tarjeta
         function updateCardMonth() {
-            cardMonth.textContent = monthSelect.value;
+            monthText.textContent = monthSelect.value;
+            monthTextInput.value = monthSelect.value;
         }
 
-        // Actualizar las fotos en la tarjeta
-        function updateCardPhotos() {
-            photosGrid.innerHTML = '';
-            
-            if (uploadedPhotos.length === 0) {
-                photosGrid.innerHTML = `
-                    <div class="photo-container empty-photo">
-                        Sube fotos para ver la tarjeta
-                    </div>
-                `;
-                return;
-            }
-            
-            // Ajustar el tamaño de las fotos según la cantidad
-            const photoCount = uploadedPhotos.length;
-            let photoSize = 'minmax(80px, 1fr)';
-            
-            if (photoCount <= 4) {
-                photoSize = 'minmax(100px, 1fr)';
-            } else if (photoCount <= 9) {
-                photoSize = 'minmax(80px, 1fr)';
-            } else {
-                photoSize = 'minmax(60px, 1fr)';
-            }
-            
-            photosGrid.style.gridTemplateColumns = `repeat(auto-fill, ${photoSize})`;
-            
-            // Crear elementos para cada foto
-            uploadedPhotos.forEach(photo => {
-                const photoContainer = document.createElement('div');
-                photoContainer.className = 'photo-container';
-                photoContainer.innerHTML = `<img src="${photo.src}" alt="Foto colaborador">`;
-                photosGrid.appendChild(photoContainer);
-            });
+        // Actualizar el texto del título
+        function updateTitleText() {
+            titleText.textContent = titleInput.value;
         }
 
-        // Actualizar el fondo de la tarjeta
+        // Actualizar el texto del mes
+        function updateMonthText() {
+            monthText.textContent = monthTextInput.value;
+        }
+
         // Actualizar el fondo de la tarjeta
         function updateCardBackground() {
             if (currentBackground.type === 'color') {
@@ -1119,42 +1693,6 @@
                         break;
                     case 'purple':
                         birthdayCard.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
-                        break;
-                    case 'rainbow':
-                        birthdayCard.style.background = 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)';
-                        break;
-                    case 'gold':
-                        birthdayCard.style.background = 'linear-gradient(135deg, #f6d365 0%, #fda085 100%)';
-                        break;
-                    case 'green':
-                        birthdayCard.style.background = 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)';
-                        break;
-                    case 'party':
-                        birthdayCard.style.background = 'linear-gradient(135deg, #ff9a9e 0%, #fad0c4 25%, #fad0c4 50%, #fbc2eb 75%, #a18cd1 100%)';
-                        break;
-                    case 'electric':
-                        birthdayCard.style.background = 'linear-gradient(135deg, #1f4037 0%, #99f2c8 100%)';
-                        break;
-                    case 'fireworks':
-                        birthdayCard.style.background = 'linear-gradient(135deg, #ff6a00 0%, #ee0979 50%, #ff6a00 100%)';
-                        break;
-                    case 'pastel':
-                        birthdayCard.style.background = 'linear-gradient(135deg, #a1c4fd 0%, #c2e9fb 50%, #fbc2eb 100%)';
-                        break;
-                    case 'tropical':
-                        birthdayCard.style.background = 'linear-gradient(135deg, #ff9a9e 0%, #fecfef 25%, #fe99c6 50%, #fecfef 75%, #ff9a9e 100%)';
-                        break;
-                    case 'neon':
-                        birthdayCard.style.background = 'linear-gradient(135deg, #00f260 0%, #0575e6 100%)';
-                        break;
-                    case 'candy':
-                        birthdayCard.style.background = 'linear-gradient(135deg, #ffdde1 0%, #ee9ca7 100%)';
-                        break;
-                    case 'carnival':
-                        birthdayCard.style.background = 'linear-gradient(135deg, #f7971e 0%, #ffd200 50%, #f7971e 100%)';
-                        break;
-                    case 'galaxy':
-                        birthdayCard.style.background = 'linear-gradient(135deg, #654ea3 0%, #eaafc8 100%)';
                         break;
                 }
             }
@@ -1178,33 +1716,64 @@
 
         // Descargar la tarjeta como imagen
         function downloadCard() {
-            // Ocultar temporalmente los controles de la interfaz
-            const originalBoxShadow = birthdayCard.style.boxShadow;
-            birthdayCard.style.boxShadow = 'none';
-            
-            html2canvas(birthdayCard, {
-                scale: 2, // Mayor resolución
-                useCORS: true, // Para permitir imágenes externas
-                allowTaint: false,
-                backgroundColor: null
-            }).then(canvas => {
-                // Restaurar el estilo original
-                birthdayCard.style.boxShadow = originalBoxShadow;
-                
-                const link = document.createElement('a');
-                link.download = `tarjeta-cumpleaños-${monthSelect.value.toLowerCase()}.png`;
-                link.href = canvas.toDataURL('image/png');
-                link.click();
-            });
-        }
+                const birthdayCard = document.getElementById("birthday-card");
 
+                html2canvas(birthdayCard, {
+                    scale: 2,
+                    useCORS: true,
+                    backgroundColor: null,
+                    onclone: (clonedDoc) => {
+                        // Forzar que todas las imágenes dentro del clon usen object-fit
+                        clonedDoc.querySelectorAll(".photo-circle img").forEach(img => {
+                            img.style.objectFit = "cover";
+                            img.style.objectPosition = "center";
+                            img.style.width = "100%";
+                            img.style.height = "100%";
+                        });
+                    }
+                }).then(canvas => {
+                    const link = document.createElement("a");
+                    link.download = "cumpleaños.png";
+                    link.href = canvas.toDataURL("image/png");
+                    link.click();
+                });
+            }
         // Reiniciar la aplicación
         function resetApp() {
             uploadedPhotos = [];
+            photoNames = [];
             monthSelect.selectedIndex = 0;
             customFrameImage = null;
             decorations = [];
-            selectedDecorationId = null;
+            selectedElement = null;
+            selectedElementType = null;
+            
+            // Restablecer textos
+            titleInput.value = 'Feliz Cumpleaños';
+            monthTextInput.value = 'Enero';
+            titleText.textContent = 'Feliz Cumpleaños';
+            monthText.textContent = 'Enero';
+            
+            // Restablecer posiciones y estilos de textos
+            titleText.style.left = '50%';
+            titleText.style.top = '15%';
+            titleText.style.fontSize = '3.5rem';
+            titleText.style.color = 'white';
+            titleText.style.fontFamily = "'Dancing Script', cursive";
+            titleText.style.textShadow = '3px 3px 6px rgba(0, 0, 0, 0.5)';
+            titleText.style.fontWeight = 'normal';
+            titleText.style.fontStyle = 'normal';
+            titleText.style.textDecoration = 'none';
+            
+            monthText.style.left = '50%';
+            monthText.style.top = '25%';
+            monthText.style.fontSize = '2.5rem';
+            monthText.style.color = '#ffd700';
+            monthText.style.fontFamily = "'Roboto', sans-serif";
+            monthText.style.textShadow = '2px 2px 4px rgba(0, 0, 0, 0.5)';
+            monthText.style.fontWeight = 'normal';
+            monthText.style.fontStyle = 'normal';
+            monthText.style.textDecoration = 'none';
             
             // Restablecer fondo a la opción por defecto
             backgroundOptions.forEach(opt => opt.classList.remove('selected'));
@@ -1227,14 +1796,21 @@
                 opt.classList.remove('selected');
             });
             
+            // Activar pestaña de decoraciones
+            tabButtons.forEach(btn => btn.classList.remove('active'));
+            document.querySelector('.tab-button[data-tab="decorations"]').classList.add('active');
+            tabContents.forEach(content => content.classList.remove('active'));
+            document.getElementById('decorations-tab').classList.add('active');
+            
             // Actualizar todas las visualizaciones
             updateUploadedPhotosDisplay();
             updateCardMonth();
-            updateCardPhotos();
+            renderPhotos();
+            generateNameInputs();
             updateCardBackground();
             updateCardFrame();
             renderDecorations();
-            updateDecorationControls();
+            updateElementControls();
         }
     </script>
 </body>
