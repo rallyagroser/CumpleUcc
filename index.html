@@ -266,21 +266,22 @@
             z-index: 5;
         }
 
-        .photo-item.selected {
+        .photo-item.selected .photo-content{
             outline: 2px dashed var(--gold-color);
-            outline-offset: 5px;
-            border-radius: 50%;
+            outline-offset: 4px
         }
 
-        .photo-circle {
-            border-radius: 50%;
+        .photo-content {
+            position: relative;
+            border-radius: 12px;
             overflow: hidden;
             border: 4px solid white;
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
             background-color: #f0f0f0;
+            cursor: move;
         }
 
-        .photo-circle img {
+        .photo-square img {
             width: 100%;
             height: 100%;
             object-fit: cover;
@@ -486,15 +487,13 @@
             color: var(--secondary-color);
         }
 
-        input[type="range"].slider {
-        -webkit-appearance: none; /* Chrome, Safari, Edge */
-        -moz-appearance: none;    /* Firefox */
-        appearance: none;         /* Estandar */
-        width: 100%;
-        height: 8px;
-        border-radius: 4px;
-        background: #ddd;
-        outline: none;
+        .slider {
+            width: 100%;
+            height: 8px;
+            border-radius: 4px;
+            background: #ddd;
+            outline: none;
+            -webkit-appearance: none;
         }
 
         .slider::-webkit-slider-thumb {
@@ -1060,67 +1059,135 @@
         }
 
         // Renderizar las fotos en la tarjeta
-        function renderPhotos() {
-            // Limpiar fotos existentes
-            document.querySelectorAll('.photo-item').forEach(el => el.remove());
-            
-            if (uploadedPhotos.length === 0) {
-                emptyPhotoMessage.style.display = 'flex';
-                namesInputContainer.style.display = 'none';
-                return;
+ function findEmptySpace(photoWidth, photoHeight, occupiedElements) {
+    const cardRect = photosContainer.getBoundingClientRect();
+    const cardWidth = cardRect.width;
+    const cardHeight = cardRect.height;
+    
+    // CORRECCIÓN: Convertir NodeList a Array antes de usar .map()
+    const occupiedRects = Array.from(occupiedElements).map(el => {
+        const rect = el.getBoundingClientRect();
+        return {
+            left: (rect.left - cardRect.left) / cardWidth,
+            top: (rect.top - cardRect.top) / cardHeight,
+            width: rect.width / cardWidth,
+            height: rect.height / cardHeight
+        };
+    });
+
+    // Buscar una posición libre iterando en una cuadrícula
+    const stepX = photoWidth / cardWidth;
+    const stepY = photoHeight / cardHeight;
+    const maxAttempts = 1000;
+
+    for (let i = 0; i < maxAttempts; i++) {
+        const x = Math.random() * (1 - stepX);
+        const y = Math.random() * (1 - stepY);
+
+        let isOccupied = false;
+        for (const occupiedRect of occupiedRects) {
+            if (x < occupiedRect.left + occupiedRect.width &&
+                x + stepX > occupiedRect.left &&
+                y < occupiedRect.top + occupiedRect.height &&
+                y + stepY > occupiedRect.top) {
+                isOccupied = true;
+                break;
             }
-            
-            emptyPhotoMessage.style.display = 'none';
-            namesInputContainer.style.display = 'block';
-            
-            // Calcular posiciones iniciales para las fotos
-            const photoCount = uploadedPhotos.length;
-            const centerX = 50;
-            const centerY = 60;
-            const radius = Math.min(30, 150 / photoCount);
-            
-            uploadedPhotos.forEach((photo, index) => {
-                const angle = (index / photoCount) * 2 * Math.PI;
-                const x = centerX + radius * Math.cos(angle);
-                const y = centerY + radius * Math.sin(angle);
-                
-                const photoItem = document.createElement('div');
-                photoItem.className = 'photo-item';
-                if (selectedElementType === 'photo' && selectedElement && selectedElement.getAttribute('data-id') == photo.id) {
-                    photoItem.classList.add('selected');
-                }
-                
-                photoItem.setAttribute('data-id', photo.id);
-                photoItem.style.left = `${x}%`;
-                photoItem.style.top = `${y}%`;
-                photoItem.style.transform = 'translate(-50%, -50%)';
-                
-                const photoCircle = document.createElement('div');
-                photoCircle.className = 'photo-circle';
-                photoCircle.style.width = '100px';
-                photoCircle.style.height = '100px';
-                photoCircle.innerHTML = `<img src="${photo.src}" alt="Foto colaborador">`;
-                
-                const photoName = document.createElement('div');
-                photoName.className = 'photo-name';
-                photoName.textContent = photoNames[index] || '';
-                
-                photoItem.appendChild(photoCircle);
-                photoItem.appendChild(photoName);
-                
-                // Eventos para seleccionar y arrastrar
-                photoItem.addEventListener('mousedown', startDrag);
-                photoItem.addEventListener('click', function(e) {
-                    e.stopPropagation();
-                    selectPhoto(photo.id);
-                });
-                
-                photosContainer.appendChild(photoItem);
-            });
-            
-            // Actualizar controles
-            updateElementControls();
         }
+
+        if (!isOccupied) {
+            // Se encontró un espacio libre
+            return {
+                x: x * 100, // Devolver en porcentaje
+                y: y * 100
+            };
+        }
+    }
+    
+    // Si no se encuentra espacio después de muchos intentos, retornar una posición por defecto
+    return {
+        x: 50,
+        y: 50
+    };
+}
+
+
+
+// Renderizar las fotos en la tarjeta (función modificada)
+function renderPhotos() {
+    // Limpiar fotos existentes
+    document.querySelectorAll('.photo-item').forEach(el => el.remove());
+    
+    if (uploadedPhotos.length === 0) {
+        emptyPhotoMessage.style.display = 'flex';
+        namesInputContainer.style.display = 'none';
+        return;
+    }
+    
+    emptyPhotoMessage.style.display = 'none';
+    namesInputContainer.style.display = 'block';
+
+    // Obtener las dimensiones del contenedor de la tarjeta
+    const cardRect = photosContainer.getBoundingClientRect();
+    const cardWidth = cardRect.width;
+    const cardHeight = cardRect.height;
+
+    // Calcular el área disponible (aproximada)
+    const occupiedElements = document.querySelectorAll('.card-title, .card-message');
+    let occupiedArea = 0;
+    occupiedElements.forEach(el => {
+        const rect = el.getBoundingClientRect();
+        occupiedArea += rect.width * rect.height;
+    });
+    const totalArea = cardWidth * cardHeight;
+    const availableArea = totalArea - occupiedArea;
+    
+    // Determinar el tamaño de las fotos dinámicamente
+    // Si el área disponible es grande, las fotos son más grandes
+    const largeSize = 120; // Tamaño en píxeles
+    const smallSize = 80;  // Tamaño en píxeles
+    const photoSize = availableArea > (totalArea * 0.6) ? largeSize : smallSize;
+
+    // Renderizar las fotos
+    uploadedPhotos.forEach((photo, index) => {
+        const photoItem = document.createElement('div');
+        photoItem.className = 'photo-item';
+        photoItem.setAttribute('data-id', photo.id);
+        
+        // Encontrar una posición libre
+        const occupied = document.querySelectorAll('.card-title, .card-message, .photo-item');
+        const newPosition = findEmptySpace(photoSize, photoSize, occupied);
+        
+        photoItem.style.left = `${newPosition.x}%`;
+        photoItem.style.top = `${newPosition.y}%`;
+        photoItem.style.transform = 'translate(-50%, -50%)';
+        
+        const photoSquare = document.createElement('div');
+        photoSquare.className = 'photo-square'; // Nuevo: clase para la forma cuadrada
+        photoSquare.style.width = `${photoSize}px`;
+        photoSquare.style.height = `${photoSize}px`;
+        photoSquare.innerHTML = `<img src="${photo.src}" alt="Foto colaborador">`;
+        
+        const photoName = document.createElement('div');
+        photoName.className = 'photo-name';
+        photoName.textContent = photoNames[index] || '';
+        
+        photoItem.appendChild(photoSquare);
+        photoItem.appendChild(photoName);
+        
+        // Eventos de selección y arrastre
+        photoItem.addEventListener('mousedown', startDrag);
+        photoItem.addEventListener('click', function(e) {
+            e.stopPropagation();
+            selectPhoto(photo.id);
+        });
+        
+        photosContainer.appendChild(photoItem);
+    });
+    
+    // Actualizar controles
+    updateElementControls();
+}
 
         // Seleccionar una decoración
         function selectDecoration(id) {
@@ -1716,28 +1783,26 @@
 
         // Descargar la tarjeta como imagen
         function downloadCard() {
-                const birthdayCard = document.getElementById("birthday-card");
+            // Ocultar temporalmente los controles de la interfaz
+            const originalBoxShadow = birthdayCard.style.boxShadow;
+            birthdayCard.style.boxShadow = 'none';
+            
+            html2canvas(birthdayCard, {
+                scale: 2, // Mayor resolución
+                useCORS: true, // Para permitir imágenes externas
+                allowTaint: false,
+                backgroundColor: null
+            }).then(canvas => {
+                // Restaurar el estilo original
+                birthdayCard.style.boxShadow = originalBoxShadow;
+                
+                const link = document.createElement('a');
+                link.download = `tarjeta-cumpleaños-${monthSelect.value.toLowerCase()}.png`;
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+            });
+        }
 
-                html2canvas(birthdayCard, {
-                    scale: 2,
-                    useCORS: true,
-                    backgroundColor: null,
-                    onclone: (clonedDoc) => {
-                        // Forzar que todas las imágenes dentro del clon usen object-fit
-                        clonedDoc.querySelectorAll(".photo-circle img").forEach(img => {
-                            img.style.objectFit = "cover";
-                            img.style.objectPosition = "center";
-                            img.style.width = "100%";
-                            img.style.height = "100%";
-                        });
-                    }
-                }).then(canvas => {
-                    const link = document.createElement("a");
-                    link.download = "cumpleaños.png";
-                    link.href = canvas.toDataURL("image/png");
-                    link.click();
-                });
-            }
         // Reiniciar la aplicación
         function resetApp() {
             uploadedPhotos = [];
