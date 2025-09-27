@@ -258,9 +258,7 @@
 
         .photo-item {
             position: absolute;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
+            display: block;
             cursor: move;
             transition: transform 0.2s;
             z-index: 5;
@@ -279,25 +277,52 @@
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
             background-color: #f0f0f0;
             cursor: move;
-        }
-
-        .photo-square img {
             width: 100%;
             height: 100%;
-            object-fit: cover;
         }
 
+        .photo-content img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        .resize-handle {
+            position: absolute;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            border: 2px solid #fff;
+            background-color: var(--primary-color);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+            display: none;
+            cursor: pointer;
+        }
+
+        .photo-item.selected .resize-handle {
+            display: block;
+        }
+
+        .resize-handle.handle-nw { top: -8px; left: -8px; cursor: nwse-resize; }
+        .resize-handle.handle-ne { top: -8px; right: -8px; cursor: nesw-resize; }
+        .resize-handle.handle-sw { bottom: -8px; left: -8px; cursor: nesw-resize; }
+        .resize-handle.handle-se { bottom: -8px; right: -8px; cursor: nwse-resize; }
+
         .photo-name {
-            margin-top: 8px;
+            position: absolute;
+            top: calc(100% + 8px);
+            left: 50%;
+            transform: translateX(-50%);
             background: rgba(255, 255, 255, 0.8);
             padding: 3px 8px;
             border-radius: 12px;
             font-size: 14px;
             font-weight: 600;
             color: var(--dark-color);
-            max-width: 120px;
+            max-width: 140px;
             text-align: center;
             word-break: break-word;
+            pointer-events: none;
         }
 
         .empty-photo {
@@ -835,6 +860,9 @@
         let selectedElementType = null; // 'decoration', 'text', 'photo'
         let isDragging = false;
         let dragOffset = { x: 0, y: 0 };
+        let dragBounds = null;
+        let isResizing = false;
+        let resizeState = null;
 
         // Catálogo de decoraciones disponibles
         const decorationCatalog = [
@@ -1058,136 +1086,98 @@
             updateElementControls();
         }
 
-        // Renderizar las fotos en la tarjeta
- function findEmptySpace(photoWidth, photoHeight, occupiedElements) {
-    const cardRect = photosContainer.getBoundingClientRect();
-    const cardWidth = cardRect.width;
-    const cardHeight = cardRect.height;
-    
-    // CORRECCIÓN: Convertir NodeList a Array antes de usar .map()
-    const occupiedRects = Array.from(occupiedElements).map(el => {
-        const rect = el.getBoundingClientRect();
-        return {
-            left: (rect.left - cardRect.left) / cardWidth,
-            top: (rect.top - cardRect.top) / cardHeight,
-            width: rect.width / cardWidth,
-            height: rect.height / cardHeight
-        };
-    });
+        function calculateInitialPhotoPosition(photoWidth, photoHeight) {
+            const containerRect = photosContainer.getBoundingClientRect();
+            const step = 20;
 
-    // Buscar una posición libre iterando en una cuadrícula
-    const stepX = photoWidth / cardWidth;
-    const stepY = photoHeight / cardHeight;
-    const maxAttempts = 1000;
-
-    for (let i = 0; i < maxAttempts; i++) {
-        const x = Math.random() * (1 - stepX);
-        const y = Math.random() * (1 - stepY);
-
-        let isOccupied = false;
-        for (const occupiedRect of occupiedRects) {
-            if (x < occupiedRect.left + occupiedRect.width &&
-                x + stepX > occupiedRect.left &&
-                y < occupiedRect.top + occupiedRect.height &&
-                y + stepY > occupiedRect.top) {
-                isOccupied = true;
-                break;
+            for (let y = 0; y <= containerRect.height - photoHeight; y += step) {
+                for (let x = 0; x <= containerRect.width - photoWidth; x += step) {
+                    if (!isPhotoCollision(null, x, y, photoWidth, photoHeight)) {
+                        return { x, y };
+                    }
+                }
             }
-        }
 
-        if (!isOccupied) {
-            // Se encontró un espacio libre
             return {
-                x: x * 100, // Devolver en porcentaje
-                y: y * 100
+                x: Math.max(0, Math.min(containerRect.width - photoWidth, (containerRect.width - photoWidth) / 2)),
+                y: Math.max(0, Math.min(containerRect.height - photoHeight, (containerRect.height - photoHeight) / 2))
             };
         }
-    }
-    
-    // Si no se encuentra espacio después de muchos intentos, retornar una posición por defecto
-    return {
-        x: 50,
-        y: 50
-    };
-}
 
+        function isPhotoCollision(photoId, x, y, width, height) {
+            return uploadedPhotos.some(photo => {
+                if (photoId !== null && photo.id === photoId) return false;
 
+                return (
+                    x < photo.x + photo.width &&
+                    x + width > photo.x &&
+                    y < photo.y + photo.height &&
+                    y + height > photo.y
+                );
+            });
+        }
 
-// Renderizar las fotos en la tarjeta (función modificada)
-function renderPhotos() {
-    // Limpiar fotos existentes
-    document.querySelectorAll('.photo-item').forEach(el => el.remove());
-    
-    if (uploadedPhotos.length === 0) {
-        emptyPhotoMessage.style.display = 'flex';
-        namesInputContainer.style.display = 'none';
-        return;
-    }
-    
-    emptyPhotoMessage.style.display = 'none';
-    namesInputContainer.style.display = 'block';
+        function renderPhotos() {
+            document.querySelectorAll('.photo-item').forEach(el => el.remove());
 
-    // Obtener las dimensiones del contenedor de la tarjeta
-    const cardRect = photosContainer.getBoundingClientRect();
-    const cardWidth = cardRect.width;
-    const cardHeight = cardRect.height;
+            if (uploadedPhotos.length === 0) {
+                emptyPhotoMessage.style.display = 'flex';
+                namesInputContainer.style.display = 'none';
+                return;
+            }
 
-    // Calcular el área disponible (aproximada)
-    const occupiedElements = document.querySelectorAll('.card-title, .card-message');
-    let occupiedArea = 0;
-    occupiedElements.forEach(el => {
-        const rect = el.getBoundingClientRect();
-        occupiedArea += rect.width * rect.height;
-    });
-    const totalArea = cardWidth * cardHeight;
-    const availableArea = totalArea - occupiedArea;
-    
-    // Determinar el tamaño de las fotos dinámicamente
-    // Si el área disponible es grande, las fotos son más grandes
-    const largeSize = 120; // Tamaño en píxeles
-    const smallSize = 80;  // Tamaño en píxeles
-    const photoSize = availableArea > (totalArea * 0.6) ? largeSize : smallSize;
+            emptyPhotoMessage.style.display = 'none';
+            namesInputContainer.style.display = 'block';
 
-    // Renderizar las fotos
-    uploadedPhotos.forEach((photo, index) => {
-        const photoItem = document.createElement('div');
-        photoItem.className = 'photo-item';
-        photoItem.setAttribute('data-id', photo.id);
-        
-        // Encontrar una posición libre
-        const occupied = document.querySelectorAll('.card-title, .card-message, .photo-item');
-        const newPosition = findEmptySpace(photoSize, photoSize, occupied);
-        
-        photoItem.style.left = `${newPosition.x}%`;
-        photoItem.style.top = `${newPosition.y}%`;
-        photoItem.style.transform = 'translate(-50%, -50%)';
-        
-        const photoSquare = document.createElement('div');
-        photoSquare.className = 'photo-square'; // Nuevo: clase para la forma cuadrada
-        photoSquare.style.width = `${photoSize}px`;
-        photoSquare.style.height = `${photoSize}px`;
-        photoSquare.innerHTML = `<img src="${photo.src}" alt="Foto colaborador">`;
-        
-        const photoName = document.createElement('div');
-        photoName.className = 'photo-name';
-        photoName.textContent = photoNames[index] || '';
-        
-        photoItem.appendChild(photoSquare);
-        photoItem.appendChild(photoName);
-        
-        // Eventos de selección y arrastre
-        photoItem.addEventListener('mousedown', startDrag);
-        photoItem.addEventListener('click', function(e) {
-            e.stopPropagation();
-            selectPhoto(photo.id);
-        });
-        
-        photosContainer.appendChild(photoItem);
-    });
-    
-    // Actualizar controles
-    updateElementControls();
-}
+            uploadedPhotos.forEach((photo, index) => {
+                const photoItem = document.createElement('div');
+                photoItem.className = 'photo-item';
+                photoItem.setAttribute('data-id', photo.id);
+                photoItem.style.left = `${photo.x}px`;
+                photoItem.style.top = `${photo.y}px`;
+                photoItem.style.width = `${photo.width}px`;
+                photoItem.style.height = `${photo.height}px`;
+
+                const photoContent = document.createElement('div');
+                photoContent.className = 'photo-content';
+
+                const img = document.createElement('img');
+                img.src = photo.src;
+                img.alt = 'Foto colaborador';
+                photoContent.appendChild(img);
+
+                ['nw', 'ne', 'sw', 'se'].forEach(direction => {
+                    const handle = document.createElement('div');
+                    handle.className = `resize-handle handle-${direction}`;
+                    handle.setAttribute('data-direction', direction);
+                    handle.addEventListener('mousedown', startResize);
+                    photoContent.appendChild(handle);
+                });
+
+                const photoName = document.createElement('div');
+                photoName.className = 'photo-name';
+                photoName.textContent = photoNames[index] || '';
+
+                photoItem.appendChild(photoContent);
+                photoItem.appendChild(photoName);
+
+                photoItem.addEventListener('mousedown', function(e) {
+                    if (e.target.classList.contains('resize-handle')) {
+                        return;
+                    }
+                    startDrag(e);
+                });
+
+                photoItem.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    selectPhoto(photo.id);
+                });
+
+                photosContainer.appendChild(photoItem);
+            });
+
+            updateElementControls();
+        }
 
         // Seleccionar una decoración
         function selectDecoration(id) {
@@ -1348,26 +1338,34 @@ function renderPhotos() {
             else if (selectedElementType === 'photo') {
                 const photoId = parseInt(selectedElement.getAttribute('data-id'));
                 const photoIndex = uploadedPhotos.findIndex(p => p.id === photoId);
-                const photoCircle = selectedElement.querySelector('.photo-circle');
-                const currentSize = parseInt(photoCircle.style.width) || 100;
-                
-                // Obtener posición actual
-                const currentX = parseInt(selectedElement.style.left) || 50;
-                const currentY = parseInt(selectedElement.style.top) || 60;
-                
+                const photoData = uploadedPhotos[photoIndex];
+                const containerRect = photosContainer.getBoundingClientRect();
+
+                if (!photoData) {
+                    return;
+                }
+
+                const availableWidth = Math.max(containerRect.width - photoData.width, 0);
+                const availableHeight = Math.max(containerRect.height - photoData.height, 0);
+                const posXValue = availableWidth === 0 ? 0 : Math.round((photoData.x / availableWidth) * 100);
+                const posYValue = availableHeight === 0 ? 0 : Math.round((photoData.y / availableHeight) * 100);
+                const sizeMin = 40;
+                const maxWidthByHeight = containerRect.height * photoData.aspectRatio;
+                const sizeMax = Math.max(sizeMin + 1, Math.round(Math.min(containerRect.width, maxWidthByHeight)));
+
                 photoControlsContainer.innerHTML = `
                     <div class="element-controls">
                         <div class="control-group">
-                            <label>Posición X: <span>${currentX}%</span></label>
-                            <input type="range" min="0" max="100" value="${currentX}" class="slider" id="photo-pos-x">
+                            <label>Posición X: <span>${Math.round((photoData.x / containerRect.width) * 100)}%</span></label>
+                            <input type="range" min="0" max="100" value="${posXValue}" class="slider" id="photo-pos-x">
                         </div>
                         <div class="control-group">
-                            <label>Posición Y: <span>${currentY}%</span></label>
-                            <input type="range" min="0" max="100" value="${currentY}" class="slider" id="photo-pos-y">
+                            <label>Posición Y: <span>${Math.round((photoData.y / containerRect.height) * 100)}%</span></label>
+                            <input type="range" min="0" max="100" value="${posYValue}" class="slider" id="photo-pos-y">
                         </div>
                         <div class="control-group">
-                            <label>Tamaño: <span>${currentSize}px</span></label>
-                            <input type="range" min="50" max="200" value="${currentSize}" class="slider" id="photo-size">
+                            <label>Ancho: <span>${Math.round(photoData.width)}px</span></label>
+                            <input type="range" min="${sizeMin}" max="${sizeMax}" value="${Math.min(sizeMax, Math.max(sizeMin, Math.round(photoData.width)))}" class="slider" id="photo-size">
                         </div>
                         <div class="control-group">
                             <label>Nombre:</label>
@@ -1375,9 +1373,9 @@ function renderPhotos() {
                         </div>
                     </div>
                 `;
-                
+
                 // Configurar event listeners para los controles de foto
-                setupPhotoControls(photoId, photoIndex, photoCircle);
+                setupPhotoControls(photoId, photoIndex);
             }
         }
 
@@ -1459,99 +1457,294 @@ function renderPhotos() {
         }
 
         // Configurar controles de foto
-        function setupPhotoControls(photoId, photoIndex, photoCircle) {
-            document.getElementById('photo-pos-x').addEventListener('input', function() {
-                selectedElement.style.left = `${this.value}%`;
-                document.querySelectorAll('.control-group label span')[0].textContent = `${this.value}%`;
-            });
-            
-            document.getElementById('photo-pos-y').addEventListener('input', function() {
-                selectedElement.style.top = `${this.value}%`;
-                document.querySelectorAll('.control-group label span')[1].textContent = `${this.value}%`;
-            });
-            
-            document.getElementById('photo-size').addEventListener('input', function() {
-                const size = `${this.value}px`;
-                photoCircle.style.width = size;
-                photoCircle.style.height = size;
-                document.querySelectorAll('.control-group label span')[2].textContent = `${this.value}px`;
-            });
-            
-            document.getElementById('photo-name').addEventListener('input', function() {
-                photoNames[photoIndex] = this.value;
-                selectedElement.querySelector('.photo-name').textContent = this.value;
-            });
+        function setupPhotoControls(photoId, photoIndex) {
+            const photoData = uploadedPhotos.find(p => p.id === photoId);
+            if (!photoData) {
+                return;
+            }
+
+            const containerRect = photosContainer.getBoundingClientRect();
+            const posXSlider = document.getElementById('photo-pos-x');
+            const posYSlider = document.getElementById('photo-pos-y');
+            const sizeSlider = document.getElementById('photo-size');
+            const nameInput = document.getElementById('photo-name');
+
+            if (posXSlider) {
+                posXSlider.addEventListener('input', function() {
+                    const availableWidth = Math.max(containerRect.width - photoData.width, 0);
+                    const sliderValue = parseInt(this.value, 10);
+                    let newX = availableWidth === 0 ? 0 : (sliderValue / 100) * availableWidth;
+                    newX = Math.min(Math.max(0, newX), containerRect.width - photoData.width);
+
+                    if (isPhotoCollision(photoData.id, newX, photoData.y, photoData.width, photoData.height)) {
+                        const currentAvailable = Math.max(containerRect.width - photoData.width, 0);
+                        const percent = currentAvailable === 0 ? 0 : Math.round((photoData.x / currentAvailable) * 100);
+                        this.value = percent;
+                        return;
+                    }
+
+                    photoData.x = newX;
+                    selectedElement.style.left = `${newX}px`;
+
+                    const span = this.parentElement.querySelector('span');
+                    if (span) {
+                        span.textContent = `${Math.round((photoData.x / containerRect.width) * 100)}%`;
+                    }
+                });
+            }
+
+            if (posYSlider) {
+                posYSlider.addEventListener('input', function() {
+                    const availableHeight = Math.max(containerRect.height - photoData.height, 0);
+                    const sliderValue = parseInt(this.value, 10);
+                    let newY = availableHeight === 0 ? 0 : (sliderValue / 100) * availableHeight;
+                    newY = Math.min(Math.max(0, newY), containerRect.height - photoData.height);
+
+                    if (isPhotoCollision(photoData.id, photoData.x, newY, photoData.width, photoData.height)) {
+                        const currentAvailable = Math.max(containerRect.height - photoData.height, 0);
+                        const percent = currentAvailable === 0 ? 0 : Math.round((photoData.y / currentAvailable) * 100);
+                        this.value = percent;
+                        return;
+                    }
+
+                    photoData.y = newY;
+                    selectedElement.style.top = `${newY}px`;
+
+                    const span = this.parentElement.querySelector('span');
+                    if (span) {
+                        span.textContent = `${Math.round((photoData.y / containerRect.height) * 100)}%`;
+                    }
+                });
+            }
+
+            if (sizeSlider) {
+                sizeSlider.addEventListener('input', function() {
+                    const maxWidth = Math.min(containerRect.width, containerRect.height * photoData.aspectRatio);
+                    const minWidth = 40;
+                    let requestedWidth = parseInt(this.value, 10);
+                    if (Number.isNaN(requestedWidth)) {
+                        requestedWidth = photoData.width;
+                    }
+
+                    const clampedWidth = Math.min(Math.max(requestedWidth, minWidth), maxWidth);
+                    if (clampedWidth !== requestedWidth) {
+                        this.value = Math.round(clampedWidth);
+                    }
+
+                    const newWidth = clampedWidth;
+                    const newHeight = newWidth / photoData.aspectRatio;
+
+                    let newX = photoData.x;
+                    let newY = photoData.y;
+
+                    if (newX + newWidth > containerRect.width) {
+                        newX = containerRect.width - newWidth;
+                    }
+                    if (newY + newHeight > containerRect.height) {
+                        newY = containerRect.height - newHeight;
+                    }
+
+                    newX = Math.max(0, newX);
+                    newY = Math.max(0, newY);
+
+                    if (newWidth < minWidth ||
+                        isPhotoCollision(photoData.id, newX, newY, newWidth, newHeight)) {
+                        this.value = Math.round(photoData.width);
+                        return;
+                    }
+
+                    photoData.width = newWidth;
+                    photoData.height = newHeight;
+                    photoData.x = newX;
+                    photoData.y = newY;
+
+                    selectedElement.style.width = `${newWidth}px`;
+                    selectedElement.style.height = `${newHeight}px`;
+                    selectedElement.style.left = `${newX}px`;
+                    selectedElement.style.top = `${newY}px`;
+
+                    const span = this.parentElement.querySelector('span');
+                    if (span) {
+                        span.textContent = `${Math.round(newWidth)}px`;
+                    }
+
+                    if (posXSlider) {
+                        const available = Math.max(containerRect.width - photoData.width, 0);
+                        const percent = available === 0 ? 0 : Math.round((photoData.x / available) * 100);
+                        posXSlider.value = percent;
+                        const spanX = posXSlider.parentElement.querySelector('span');
+                        if (spanX) {
+                            spanX.textContent = `${Math.round((photoData.x / containerRect.width) * 100)}%`;
+                        }
+                    }
+
+                    if (posYSlider) {
+                        const available = Math.max(containerRect.height - photoData.height, 0);
+                        const percent = available === 0 ? 0 : Math.round((photoData.y / available) * 100);
+                        posYSlider.value = percent;
+                        const spanY = posYSlider.parentElement.querySelector('span');
+                        if (spanY) {
+                            spanY.textContent = `${Math.round((photoData.y / containerRect.height) * 100)}%`;
+                        }
+                    }
+                });
+            }
+
+            if (nameInput) {
+                nameInput.addEventListener('input', function() {
+                    photoNames[photoIndex] = this.value;
+                    selectedElement.querySelector('.photo-name').textContent = this.value;
+                });
+            }
         }
 
         // Funcionalidad de arrastrar elementos
         function startDrag(e) {
+            if (isResizing || e.target.classList.contains('resize-handle')) {
+                return;
+            }
+
             e.preventDefault();
             e.stopPropagation();
-            
+
             isDragging = true;
-            
-            const rect = birthdayCard.getBoundingClientRect();
-            const startX = e.clientX - rect.left;
-            const startY = e.clientY - rect.top;
-            
-            // Determinar qué tipo de elemento estamos arrastrando
+            dragBounds = null;
+
+            const cardRect = birthdayCard.getBoundingClientRect();
+            const startX = e.clientX - cardRect.left;
+            const startY = e.clientY - cardRect.top;
+
             if (e.target.classList.contains('decoration')) {
                 const decorationId = parseInt(e.target.getAttribute('data-id'));
                 const decoration = decorations.find(d => d.id === decorationId);
-                
-                if (!decoration) return;
-                
+
+                if (!decoration) {
+                    isDragging = false;
+                    return;
+                }
+
                 selectDecoration(decorationId);
-                
+
+                dragBounds = {
+                    left: cardRect.left,
+                    top: cardRect.top,
+                    width: cardRect.width,
+                    height: cardRect.height
+                };
+
                 dragOffset = {
-                    x: startX - (decoration.x / 100 * rect.width),
-                    y: startY - (decoration.y / 100 * rect.height)
+                    x: startX - (decoration.x / 100 * cardRect.width),
+                    y: startY - (decoration.y / 100 * cardRect.height)
                 };
             }
             else if (e.target.classList.contains('text-element')) {
                 selectText(e.target);
-                
-                const currentX = parseInt(e.target.style.left) || 50;
-                const currentY = parseInt(e.target.style.top) || (e.target.id === 'title-text' ? 15 : 25);
-                
+
+                dragBounds = {
+                    left: cardRect.left,
+                    top: cardRect.top,
+                    width: cardRect.width,
+                    height: cardRect.height
+                };
+
+                const currentX = parseFloat(e.target.style.left) || 50;
+                const currentY = parseFloat(e.target.style.top) || (e.target.id === 'title-text' ? 15 : 25);
+
                 dragOffset = {
-                    x: startX - (currentX / 100 * rect.width),
-                    y: startY - (currentY / 100 * rect.height)
+                    x: startX - (currentX / 100 * cardRect.width),
+                    y: startY - (currentY / 100 * cardRect.height)
                 };
             }
             else if (e.target.closest('.photo-item')) {
                 const photoItem = e.target.closest('.photo-item');
                 const photoId = parseInt(photoItem.getAttribute('data-id'));
-                
+
                 selectPhoto(photoId);
-                
-                const currentX = parseInt(photoItem.style.left) || 50;
-                const currentY = parseInt(photoItem.style.top) || 60;
-                
+
+                const photoData = uploadedPhotos.find(p => p.id === photoId);
+                if (!photoData) {
+                    isDragging = false;
+                    return;
+                }
+
+                const containerRect = photosContainer.getBoundingClientRect();
+                dragBounds = {
+                    left: containerRect.left,
+                    top: containerRect.top,
+                    width: containerRect.width,
+                    height: containerRect.height
+                };
+
                 dragOffset = {
-                    x: startX - (currentX / 100 * rect.width),
-                    y: startY - (currentY / 100 * rect.height)
+                    x: e.clientX - containerRect.left - photoData.x,
+                    y: e.clientY - containerRect.top - photoData.y
                 };
             }
-            
+
             document.addEventListener('mousemove', drag);
             document.addEventListener('mouseup', stopDrag);
         }
 
         function drag(e) {
             if (!isDragging || !selectedElement) return;
-            
+
+            if (selectedElementType === 'photo') {
+                const photoId = parseInt(selectedElement.getAttribute('data-id'));
+                const photoData = uploadedPhotos.find(p => p.id === photoId);
+
+                if (!photoData || !dragBounds) {
+                    return;
+                }
+
+                let newX = e.clientX - dragBounds.left - dragOffset.x;
+                let newY = e.clientY - dragBounds.top - dragOffset.y;
+
+                newX = Math.max(0, Math.min(dragBounds.width - photoData.width, newX));
+                newY = Math.max(0, Math.min(dragBounds.height - photoData.height, newY));
+
+                if (isPhotoCollision(photoData.id, newX, newY, photoData.width, photoData.height)) {
+                    return;
+                }
+
+                photoData.x = newX;
+                photoData.y = newY;
+
+                selectedElement.style.left = `${newX}px`;
+                selectedElement.style.top = `${newY}px`;
+
+                if (photoControlsContainer.querySelector('.control-group')) {
+                    const spans = photoControlsContainer.querySelectorAll('.control-group label span');
+                    if (spans[0]) spans[0].textContent = `${Math.round((newX / dragBounds.width) * 100)}%`;
+                    if (spans[1]) spans[1].textContent = `${Math.round((newY / dragBounds.height) * 100)}%`;
+                }
+
+                const posXSlider = document.getElementById('photo-pos-x');
+                const posYSlider = document.getElementById('photo-pos-y');
+                if (posXSlider) {
+                    const availableWidth = Math.max(dragBounds.width - photoData.width, 0);
+                    const percent = availableWidth === 0 ? 0 : Math.round((newX / availableWidth) * 100);
+                    posXSlider.value = percent;
+                }
+                if (posYSlider) {
+                    const availableHeight = Math.max(dragBounds.height - photoData.height, 0);
+                    const percent = availableHeight === 0 ? 0 : Math.round((newY / availableHeight) * 100);
+                    posYSlider.value = percent;
+                }
+
+                return;
+            }
+
             const rect = birthdayCard.getBoundingClientRect();
             const x = e.clientX - rect.left - dragOffset.x;
             const y = e.clientY - rect.top - dragOffset.y;
-            
+
             const newX = Math.max(0, Math.min(100, (x / rect.width) * 100));
             const newY = Math.max(0, Math.min(100, (y / rect.height) * 100));
-            
+
             if (selectedElementType === 'decoration') {
                 const decorationId = parseInt(selectedElement.getAttribute('data-id'));
                 const decoration = decorations.find(d => d.id === decorationId);
-                
+
                 if (decoration) {
                     decoration.x = newX;
                     decoration.y = newY;
@@ -1561,21 +1754,9 @@ function renderPhotos() {
             else if (selectedElementType === 'text') {
                 selectedElement.style.left = `${newX}%`;
                 selectedElement.style.top = `${newY}%`;
-                
-                // Actualizar controles si están visibles
+
                 if (textControlsContainer.querySelector('.control-group')) {
                     const spans = textControlsContainer.querySelectorAll('.control-group label span');
-                    if (spans[0]) spans[0].textContent = `${Math.round(newX)}%`;
-                    if (spans[1]) spans[1].textContent = `${Math.round(newY)}%`;
-                }
-            }
-            else if (selectedElementType === 'photo') {
-                selectedElement.style.left = `${newX}%`;
-                selectedElement.style.top = `${newY}%`;
-                
-                // Actualizar controles si están visibles
-                if (photoControlsContainer.querySelector('.control-group')) {
-                    const spans = photoControlsContainer.querySelectorAll('.control-group label span');
                     if (spans[0]) spans[0].textContent = `${Math.round(newX)}%`;
                     if (spans[1]) spans[1].textContent = `${Math.round(newY)}%`;
                 }
@@ -1584,8 +1765,190 @@ function renderPhotos() {
 
         function stopDrag() {
             isDragging = false;
+            dragBounds = null;
             document.removeEventListener('mousemove', drag);
             document.removeEventListener('mouseup', stopDrag);
+        }
+
+        function startResize(e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            const handle = e.target;
+            const photoItem = handle.closest('.photo-item');
+            if (!photoItem) {
+                return;
+            }
+
+            const photoId = parseInt(photoItem.getAttribute('data-id'));
+            const photoData = uploadedPhotos.find(p => p.id === photoId);
+            if (!photoData) {
+                return;
+            }
+
+            selectPhoto(photoId);
+
+            const containerRect = photosContainer.getBoundingClientRect();
+
+            isResizing = true;
+            resizeState = {
+                photoId,
+                direction: handle.getAttribute('data-direction'),
+                startX: e.clientX,
+                startY: e.clientY,
+                initialWidth: photoData.width,
+                initialHeight: photoData.height,
+                initialX: photoData.x,
+                initialY: photoData.y,
+                containerRect
+            };
+
+            document.addEventListener('mousemove', resizeElement);
+            document.addEventListener('mouseup', stopResize);
+        }
+
+        function resizeElement(e) {
+            if (!isResizing || !resizeState) {
+                return;
+            }
+
+            const photoData = uploadedPhotos.find(p => p.id === resizeState.photoId);
+            if (!photoData) {
+                return;
+            }
+
+            const { direction, startX, startY, initialWidth, initialHeight, initialX, initialY, containerRect } = resizeState;
+
+            let deltaX = 0;
+            let deltaY = 0;
+
+            if (direction.includes('e')) {
+                deltaX = e.clientX - startX;
+            } else if (direction.includes('w')) {
+                deltaX = startX - e.clientX;
+            }
+
+            if (direction.includes('s')) {
+                deltaY = e.clientY - startY;
+            } else if (direction.includes('n')) {
+                deltaY = startY - e.clientY;
+            }
+
+            const dominantDelta = Math.abs(deltaX) > Math.abs(deltaY) ? deltaX : deltaY;
+            let newWidth = initialWidth + dominantDelta;
+            if (newWidth < 40) {
+                newWidth = 40;
+            }
+            let newHeight = newWidth / photoData.aspectRatio;
+
+            let newX = initialX;
+            let newY = initialY;
+
+            if (direction.includes('w')) {
+                newX = initialX + (initialWidth - newWidth);
+            }
+            if (direction.includes('n')) {
+                newY = initialY + (initialHeight - newHeight);
+            }
+
+            if (newX < 0) {
+                const diff = -newX;
+                newX = 0;
+                newWidth -= diff;
+                newHeight = newWidth / photoData.aspectRatio;
+            }
+
+            if (newY < 0) {
+                const diff = -newY;
+                newY = 0;
+                newHeight -= diff;
+                newWidth = newHeight * photoData.aspectRatio;
+            }
+
+            if (newX + newWidth > containerRect.width) {
+                const diff = (newX + newWidth) - containerRect.width;
+                newWidth -= diff;
+                newHeight = newWidth / photoData.aspectRatio;
+                if (direction.includes('w')) {
+                    newX = containerRect.width - newWidth;
+                }
+            }
+
+            if (newY + newHeight > containerRect.height) {
+                const diff = (newY + newHeight) - containerRect.height;
+                newHeight -= diff;
+                newWidth = newHeight * photoData.aspectRatio;
+                if (direction.includes('n')) {
+                    newY = containerRect.height - newHeight;
+                }
+            }
+
+            if (newWidth < 40) {
+                return;
+            }
+
+            if (isPhotoCollision(photoData.id, newX, newY, newWidth, newHeight)) {
+                return;
+            }
+
+            photoData.width = newWidth;
+            photoData.height = newHeight;
+            photoData.x = newX;
+            photoData.y = newY;
+
+            selectedElement.style.width = `${newWidth}px`;
+            selectedElement.style.height = `${newHeight}px`;
+            selectedElement.style.left = `${newX}px`;
+            selectedElement.style.top = `${newY}px`;
+
+            const sizeSlider = document.getElementById('photo-size');
+            if (sizeSlider) {
+                sizeSlider.value = Math.round(newWidth);
+                const sizeSpan = sizeSlider.parentElement.querySelector('span');
+                if (sizeSpan) {
+                    sizeSpan.textContent = `${Math.round(newWidth)}px`;
+                }
+            }
+
+            const posXSlider = document.getElementById('photo-pos-x');
+            const posYSlider = document.getElementById('photo-pos-y');
+            if (posXSlider) {
+                const availableWidth = Math.max(containerRect.width - photoData.width, 0);
+                const percent = availableWidth === 0 ? 0 : Math.round((photoData.x / availableWidth) * 100);
+                posXSlider.value = percent;
+                const spanX = posXSlider.parentElement.querySelector('span');
+                if (spanX) {
+                    spanX.textContent = `${Math.round((photoData.x / containerRect.width) * 100)}%`;
+                }
+            }
+            if (posYSlider) {
+                const availableHeight = Math.max(containerRect.height - photoData.height, 0);
+                const percent = availableHeight === 0 ? 0 : Math.round((photoData.y / availableHeight) * 100);
+                posYSlider.value = percent;
+                const spanY = posYSlider.parentElement.querySelector('span');
+                if (spanY) {
+                    spanY.textContent = `${Math.round((photoData.y / containerRect.height) * 100)}%`;
+                }
+            }
+
+            const spans = photoControlsContainer.querySelectorAll('.control-group label span');
+            if (spans[0]) {
+                spans[0].textContent = `${Math.round((photoData.x / containerRect.width) * 100)}%`;
+            }
+            if (spans[1]) {
+                spans[1].textContent = `${Math.round((photoData.y / containerRect.height) * 100)}%`;
+            }
+        }
+
+        function stopResize() {
+            if (!isResizing) {
+                return;
+            }
+
+            isResizing = false;
+            resizeState = null;
+            document.removeEventListener('mousemove', resizeElement);
+            document.removeEventListener('mouseup', stopResize);
         }
 
         // Convertir RGB a HEX
@@ -1606,38 +1969,77 @@ function renderPhotos() {
 
         // Manejar la subida de fotos
         function handlePhotoUpload(event) {
-            const files = event.target.files;
-            
-            for (let i = 0; i < files.length; i++) {
-                const file = files[i];
-                
-                // Verificar que sea una imagen
-                if (!file.type.match('image.*')) {
-                    continue;
-                }
-                
-                const reader = new FileReader();
-                
-                reader.onload = function(e) {
-                    // Agregar la foto al array
-                    uploadedPhotos.push({
-                        id: Date.now() + i,
-                        src: e.target.result
-                    });
-                    
-                    // Inicializar nombre vacío
-                    photoNames.push('');
-                    
-                    // Actualizar la interfaz
-                    updateUploadedPhotosDisplay();
-                    renderPhotos();
-                    generateNameInputs();
-                };
-                
-                reader.readAsDataURL(file);
+            const files = Array.from(event.target.files || []);
+            if (!files.length) {
+                return;
             }
-            
-            // Limpiar el input para permitir subir las mismas fotos otra vez
+
+            const containerRect = photosContainer.getBoundingClientRect();
+
+            files.forEach((file, index) => {
+                if (!file.type.match('image.*')) {
+                    return;
+                }
+
+                const reader = new FileReader();
+
+                reader.onload = function(e) {
+                    const img = new Image();
+
+                    img.onload = function() {
+                        const maxWidth = containerRect.width * 0.35;
+                        const maxHeight = containerRect.height * 0.6;
+                        const scaleBySize = Math.min(maxWidth / img.naturalWidth, maxHeight / img.naturalHeight, 1);
+                        const scaleByContainer = Math.min(containerRect.width / img.naturalWidth, containerRect.height / img.naturalHeight, 1);
+
+                        let scale = Math.min(scaleBySize, scaleByContainer);
+                        const minDimension = 80;
+                        const minScale = Math.min(minDimension / img.naturalWidth, minDimension / img.naturalHeight, 1);
+                        scale = Math.max(scale, minScale);
+
+                        let width = img.naturalWidth * scale;
+                        let height = img.naturalHeight * scale;
+
+                        if (width > containerRect.width) {
+                            const adjust = containerRect.width / width;
+                            width *= adjust;
+                            height *= adjust;
+                        }
+
+                        if (height > containerRect.height) {
+                            const adjust = containerRect.height / height;
+                            width *= adjust;
+                            height *= adjust;
+                        }
+
+                        const position = calculateInitialPhotoPosition(width, height);
+
+                        const photoData = {
+                            id: Date.now() + index,
+                            src: e.target.result,
+                            width,
+                            height,
+                            baseWidth: width,
+                            baseHeight: height,
+                            aspectRatio: img.naturalWidth / img.naturalHeight,
+                            x: position.x,
+                            y: position.y
+                        };
+
+                        uploadedPhotos.push(photoData);
+                        photoNames.push('');
+
+                        updateUploadedPhotosDisplay();
+                        renderPhotos();
+                        generateNameInputs();
+                    };
+
+                    img.src = e.target.result;
+                };
+
+                reader.readAsDataURL(file);
+            });
+
             event.target.value = '';
         }
 
@@ -1786,7 +2188,21 @@ function renderPhotos() {
             // Ocultar temporalmente los controles de la interfaz
             const originalBoxShadow = birthdayCard.style.boxShadow;
             birthdayCard.style.boxShadow = 'none';
-            
+
+            const savedType = selectedElementType;
+            let savedId = null;
+            let savedTextId = null;
+
+            if (selectedElement) {
+                if (savedType === 'photo' || savedType === 'decoration') {
+                    savedId = selectedElement.getAttribute('data-id');
+                } else if (savedType === 'text') {
+                    savedTextId = selectedElement.id;
+                }
+            }
+
+            deselectAll();
+
             html2canvas(birthdayCard, {
                 scale: 2, // Mayor resolución
                 useCORS: true, // Para permitir imágenes externas
@@ -1795,11 +2211,22 @@ function renderPhotos() {
             }).then(canvas => {
                 // Restaurar el estilo original
                 birthdayCard.style.boxShadow = originalBoxShadow;
-                
+
                 const link = document.createElement('a');
                 link.download = `tarjeta-cumpleaños-${monthSelect.value.toLowerCase()}.png`;
                 link.href = canvas.toDataURL('image/png');
                 link.click();
+
+                if (savedType === 'photo' && savedId) {
+                    selectPhoto(parseInt(savedId));
+                } else if (savedType === 'decoration' && savedId) {
+                    selectDecoration(parseInt(savedId));
+                } else if (savedType === 'text' && savedTextId) {
+                    const textElement = document.getElementById(savedTextId);
+                    if (textElement) {
+                        selectText(textElement);
+                    }
+                }
             });
         }
 
